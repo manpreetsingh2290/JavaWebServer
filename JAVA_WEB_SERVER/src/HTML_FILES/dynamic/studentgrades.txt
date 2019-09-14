@@ -1,0 +1,14 @@
+Aldoreh Adam,100
+Chopra Vivek,96
+Dao Joseph,100
+Dhillon Tajinder,100
+Easterbrook Zach,100
+Falodun Tomisin,100
+Lu Yicheng,100
+Lucier Brandon,100
+Mallem Ali,68
+Melanson Mike,90
+Singh Manpreet,90
+Wang Zheng,100
+Zhang Xiaobang,100
+Zeidler Matthew,94

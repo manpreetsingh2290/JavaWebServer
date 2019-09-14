@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Instructor Page</title>
+    <link href="favicon.jpg" rel="icon" >
+</head>
+<body>
+
+<form action="studentgradesubmit" method="post" enctype="application/json" >
+<div align="center" >
+<BR><BR>
+<table style="width:50%" border="1" align="center">
+  <tr>
+    <th>Student Name</th>
+    <th>File</th> 
+    <th>Grades</th>
+  </tr>
+  <tr>
+	<td>#StudentName#</td> 
+    <td><a href="#StudentResource#" download="#StudentResource#"><button type="button"> Download Assignment</button></a></td>
+	<td><input type="number" min=0 max=100 name="Grades" value=#StudentGrade# ><label>/100</label></td>
+  </tr>
+</table>
+<input type="hidden" name="StudentName" value="#StudentName#">
+
+<BR><BR>
+<button type="submit" align="center">Submit</button>
+</div>
+</form>
+</body>
+</html>
