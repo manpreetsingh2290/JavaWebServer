@@ -37,19 +37,23 @@ public class JavaServer implements Runnable {
 
 	public static void main(String[] args) throws Exception {
 		System.out.println(config);
-		if (config.containsKey("Programming Language"))// && config.containsKey("Prams Mode") &&
-														// config.containsKey("Excecutable Path") ) {
+		if (config.containsKey("Programming Language"))									
 		{
 			System.out.println("Starting server");
-			ServerSocket myserver = new ServerSocket(PORT);
+			ServerSocket serverSocket = new ServerSocket(PORT);
 			
 			while (true) {
-				JavaServer myServer = new JavaServer(myserver.accept());
+				JavaServer myServer = new JavaServer(serverSocket.accept());
 				
+				//Create new thread for each new request
 				Thread thread = new Thread(myServer);
 				thread.start();
 			}	
 			
+		}
+		else
+		{
+			throw new Exception("Programming language is not configured");
 		}
 
 	}
@@ -74,16 +78,13 @@ public class JavaServer implements Runnable {
 		if (config.get("Single Executable") != null && "True".equalsIgnoreCase(config.get("Single Executable"))) {
 			singleExecuatble = true;
 		}			
-
-			//BufferedReader req_reader = new BufferedReader(new InputStreamReader(inboSocket.getInputStream()));
-
+			//Creating data input stream for incoming request data
 			DataInputStream in_binary = new DataInputStream(new BufferedInputStream(inboSocket.getInputStream()));
-
-			//HashMap<String, String> headerDataMap = new HashMap<String, String>();
+			
 			BufferedOutputStream response_stream = new BufferedOutputStream(inboSocket.getOutputStream());
 			PrintWriter response = new PrintWriter(new OutputStreamWriter(inboSocket.getOutputStream()));
 			
-
+			//Reading and parsing the HTTP request
 			RequestData requestData = readHTTPRequest(in_binary);			
 
 			String request=requestData.getRequestStr();
@@ -458,9 +459,11 @@ public class JavaServer implements Runnable {
 				resource = resource.substring(0, resource.lastIndexOf('.'));
 			// System.out.println(resource);
 			String executableFileName = "";
+			//If only single executable configured
 			if (singleExecuatble) {
 				executableFileName = config.get("Executable_File_Name");
 			} else {
+				//Get the executable for the respective request resource
 				executableFileName = executableMapping.get(resource);
 			}
 
@@ -472,41 +475,52 @@ public class JavaServer implements Runnable {
 			e.printStackTrace();
 		}
 
-		// return new File(PATH + "\\404.html");
+		
 		return null;
 
 	}
 
 	public static RequestData readHTTPRequest(DataInputStream dis) throws Exception {
-		// Charset charset = new
+		
+		//Object to store parsed request data
 		RequestData requestData = new RequestData();
 		ArrayList<String> formData = new ArrayList<String>();
+		//List to store uploaded multiple files data
 		ArrayList<FileFormDataInfo> fileDataList = new ArrayList<FileFormDataInfo>();
-		//FileFormDataInfo fileInfo = null;
-		String tempFullBodyStr="";
+		
+		StringBuilder tempFullBodyStr= new StringBuilder("");
 		String requestStr = "";
 		
+		//Read and parse the HTTP request header
 		requestData =readHeaderData(dis,requestData);
+		
+		//Reading the key values pairs HTTP header data
 		HashMap<String, String> headerDataMap = requestData.getHeaderDataMap();
+		
+		//Reading complete Header data to be sent to other executables created by other teams
 		requestStr=requestData.getRequestStr();
 		
 		System.out.println("------------------------------Message Header Start---------------------------");
 		System.out.println(requestData.getRequestStr());
 		System.out.println("------------------------------Message Header End---------------------------");
 
+		//Setting default content length
 		int contentLength = 20048;
 		String boundryString = "";
 		boolean contiansBoundry = false;
-		// Content-Type: multipart/form-data;
-		// boundary=----WebKitFormBoundaryOSNlARjm5MBHLPbc
+		
 		boolean containsMessageBody=false;
+		//Reading the content length from the header map
 		if (headerDataMap.containsKey("Content-Length")) {
 			contentLength = Integer.parseInt(headerDataMap.get("Content-Length"));
 			containsMessageBody=true;
 		}
-
+		//Reading the content type from the header map
 		if (headerDataMap.containsKey("Content-Type")) {
+			
+			//If content type also includes boundary field
 			if (headerDataMap.get("Content-Type").contains("boundary=")) {
+				//Reading the boundary separator string value from content type field
 				boundryString = headerDataMap.get("Content-Type").split(";")[1].split("=")[1];
 				contiansBoundry = true;
 			}
@@ -516,37 +530,46 @@ public class JavaServer implements Runnable {
 		
 		
 		/////////////////////////////////////////////////////////////////////////////////////////////////////////
-		byte byteee;
+		byte databyte;
 		String multipartDataDescStr="";
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		int ch;
+		
+		//Flag to track end of body
 		boolean endOfBody=false;
 		
+		//If request contains message body as well as boundary (signifies it is a multipart data and contains files)
 		if(containsMessageBody & contiansBoundry)
 		{
 				while (!endOfBody) {
+					
+					//Reading data one byte at a time
 					ch = dis.read();
+					
+					//Writing the read byte to the byte array
 					baos.write(ch);
 					
 					multipartDataDescStr = new String(baos.toByteArray());
-					//First new line
+					//Two consecutive carriage return ("\r\n\r\n") indicates that subpart's header data has been read
 					if(multipartDataDescStr.contains("\r\n\r\n"))
 					{
 						System.out.println();
 						
-						//now Start reading the binary data
+						//New byte array for body data
 						baos = new ByteArrayOutputStream();
 						String tempStr="";
 						long numBytes=0;
-						//byte[]  preViousByteArray=null;
+						
+						//Parse the header of subpart (of multipart data)
 						FileFormDataInfo  fileDataInfo= parseMutipartDataDesc(multipartDataDescStr);
 						
 						System.out.println(":::::::::::::::::multipartDataDescStr Start :::::::::::::::::");
 						System.out.println(multipartDataDescStr);
 						System.out.println(":::::::::::::::::multipartDataDescStr End :::::::::::::::::");
 						
-						tempFullBodyStr+=multipartDataDescStr;
+						tempFullBodyStr.append(multipartDataDescStr);
 						
+						//If data type is a File
 						if(FileFormDataInfo.DATA_TYPE_FILE.equals(fileDataInfo.getDataType()))
 						{
 								boolean endOfFileData=false;
@@ -556,6 +579,7 @@ public class JavaServer implements Runnable {
 								if(fileDataInfo.getFileName()!=null && !"".equalsIgnoreCase(fileDataInfo.getFileName()))
 								{
 									isFileReceived=true;
+									//Location where file will be uploaded/saved
 									String uploadedLocation = System.getProperty("user.dir") + uploadedFilePath + fileDataInfo.getFileName();
 									//System.out.println(uploadedLocation);
 									fileWriterBin = new DataOutputStream(new FileOutputStream(uploadedLocation));
@@ -567,25 +591,36 @@ public class JavaServer implements Runnable {
 								numBytes=0;
 								//int tempCount=0;
 								boolean isNewLineSkipped=false;
+								
+								//Read file data byte by byte untill end of file is reached
 								while(!endOfFileData)
 								{
-									baos.size();
-									byteee=dis.readByte();
+									//baos.size();
+									databyte=dis.readByte();
 									
-									baos.write(byteee);
+									//Write the read byte to byte array output stream
+									baos.write(databyte);
+									
+									//Byte counter
 									numBytes++;
 									
+									//Convert the byte arry output stream to string to check the 
+									//presence of new line character and end of boundary string
 									tempStr= new String(baos.toByteArray());
 									if(tempStr.contains("\n"))
 									{							
-										System.out.println(tempStr); 
-										tempFullBodyStr+=tempStr;
+										System.out.println(tempStr);
+										//Appending to full body string for debugging purposes
+										tempFullBodyStr.append(tempStr);
+										
+										//If end of entire body is reached (body boundary end string is read)
 										if(tempStr.contains(boundryString+"--"))
 										{
 										  	endOfBody=true;
 											endOfFileData=true;
 											//System.out.println(tempCount);
 										}
+										//If boundary string encountered that  means end of one subpart
 										else if(tempStr.contains(boundryString))
 										{
 											endOfFileData=true;
@@ -594,36 +629,40 @@ public class JavaServer implements Runnable {
 										
 										if(endOfFileData && isFileReceived)
 										{
+											//Closing the file writer stream
 											fileWriterBin.close();
 											System.out.println("File uploaded Sucessfully");
 										}
 										else if(isFileReceived)
 										{
+											
+										//If file contains new line character only then write it to the file on local drive
 										  if(isNewLineSkipped)
 											{
+											    
 												fileWriterBin.write("\r\n".getBytes());
 												isNewLineSkipped=false;
 											}
 											
 											int len=0;
+											//This new line character can be the end of file indicator also so writing only in next iteration
 											if(tempStr.endsWith("\r\n"))
 											{
 												len="\r\n".getBytes().length;
 												isNewLineSkipped=true;
 											}
+											
+											//Writing the read file data in file saved at local drive
 											fileWriterBin.write(baos.toByteArray(),0,(baos.size()- len));
 										}
-										
-										//preViousByteArray=baos.toByteArray();
-										
+																		
 										baos = new ByteArrayOutputStream();
-									}
+									}									
 									
-									
-								}
-								
+								}								
 							
 						}
+						//If data type is a form field
 						else if(FileFormDataInfo.DATA_TYPE_FORM_FEILD.equals(fileDataInfo.getDataType()))
 						{
 							System.out.println("Reading Form Field Data for Field: "+fileDataInfo.getName());
@@ -632,26 +671,38 @@ public class JavaServer implements Runnable {
 							baos = new ByteArrayOutputStream();
 							String formFieldData="";
 							numBytes=0;
+							
+							//Read form field data byte by byte untill end of form field is reached
 							while(!endOfFormData)
 							{
-								baos.size();
-								byteee=dis.readByte();												
-								baos.write(byteee);
+								//baos.size();
+								
+								databyte=dis.readByte();	
+								
+								//Write the read byte to byte array output stream
+								baos.write(databyte);
+								
+								//Byte Counter
 								numBytes++;
 								
-								
+								//Convert the byte arry output stream to string to check the 
+								//presence of new line character and end of boundary string
 								tempStr= new String(baos.toByteArray());
-								//System.out.println("tempStr \n"+tempStr);
 								if(tempStr.contains("\n"))
 								{							
 									//System.out.println("Received Bytes: "+numBytes);
 									System.out.println(tempStr);
-									tempFullBodyStr+=tempStr;
+									
+									//Appending to full body string for debugging purposes
+									tempFullBodyStr.append(tempStr);
+									
+									//If end of entire body is reached (body boundary end string is read)
 									if(tempStr.contains(boundryString+"--"))
 									{
 									  	endOfBody=true;
 									  	endOfFormData=true;
 									}
+									//If boundary string encountered that  means end of one subpart
 									else if(tempStr.contains(boundryString))
 									{
 										endOfFormData=true;
@@ -660,14 +711,17 @@ public class JavaServer implements Runnable {
 									
 									if(!endOfFormData)
 									{
+										//Converting the byte array to form field string 
 										formFieldData+=new String(baos.toByteArray());
 									}
 									else
 									{
+										//Adding read form field data to the form data list
 										formData.add(fileDataInfo.getName()+"="+formFieldData);
 										System.out.println("Field Data: "+fileDataInfo.getName()+"="+formFieldData);
 									}
 								
+									//Creating new byte array stream for new form field data
 									baos = new ByteArrayOutputStream();
 								}
 							}
@@ -676,6 +730,7 @@ public class JavaServer implements Runnable {
 						
 						//fileWriterBin.close();
 						
+						//Resetting to read  next subpart
 						multipartDataDescStr="";
 					}
 				}
@@ -694,9 +749,11 @@ public class JavaServer implements Runnable {
 		
 		String bodyDataStr = "";
 		byte bodyData[] = new byte[contentLength];
+		//If body is present without boundary string that means there is no file data
 		if(containsMessageBody && !contiansBoundry)
 		{						
 			while (bodyDataStr == "") {
+				//Reading the entire body of HTTP request
 				dis.read(bodyData);
 				bodyDataStr = new String(bodyData).trim();
 				if (!contiansBoundry) {
@@ -730,7 +787,7 @@ public class JavaServer implements Runnable {
 			baos.write(ch);
 			if (ch == '\r') {
 				ch = dis.read();
-				// the second newline??
+				
 				if (ch == '\n') {
 					headerStr += new String(baos.toByteArray());
 					baos.close();
@@ -795,11 +852,14 @@ public class JavaServer implements Runnable {
 		return fileInfo;
 	}
 	
+	//Method to parse the multipart data header information
 	public static FileFormDataInfo parseMutipartDataDesc(String dataDescription)
 	{
+		//Creating object to store parsed data
 		FileFormDataInfo dataDescInfo= new FileFormDataInfo();
 		dataDescription = dataDescription.trim();
 
+		//Read each header line in array
 		String contentDescData[] = dataDescription.split("\r\n");
 		String fileName = "";
 		String formField = "";
@@ -809,6 +869,8 @@ public class JavaServer implements Runnable {
 				continue;
 			}
 			String contentDescKeyValue[] = str.split(":");
+			
+			//If subpart header contains key 'Content-Disposition' and uploaded file's name is present
 			if (contentDescKeyValue[0].contains("Content-Disposition")
 					&& contentDescKeyValue[1].contains("form-data")
 					&& contentDescKeyValue[1].contains("filename")) {
@@ -818,24 +880,36 @@ public class JavaServer implements Runnable {
 						continue;
 					}
 					if (strr.contains("filename")) {
+						
+						//Getting the file name and removing the double quotes from name
 						fileName = strr.split("=")[1].replace("\"", "");
 						//itIsAFile = true;
+						
+						//Setting data type to file
 						dataDescInfo.setDataType(FileFormDataInfo.DATA_TYPE_FILE);
 						
+						//Saving file name in object
 						dataDescInfo.setFileName(fileName);
 						break;
 					}
 				}
-			} else if (contentDescKeyValue[0].contains("Content-Disposition")
+			} 
+			//Else If subpart header contains key 'Content-Disposition' and only the form data is present
+			else if (contentDescKeyValue[0].contains("Content-Disposition")
 					&& contentDescKeyValue[1].contains("form-data")) {
+				//Splitting the data separated by ';'
 				String strArry[] = contentDescKeyValue[1].split(";");
 				for (String strr : strArry) {
 					if ("".equalsIgnoreCase(str)) {
 						continue;
 					}
 					if (strr.contains("name")) {
+						
+						//Getting the form field name and removing the double quotes from name
 						formField = strr.split("=")[1].replace("\"", "");
 						//itIsAFormField = true;
+						
+						//Setting data type to form field
 						dataDescInfo.setDataType(FileFormDataInfo.DATA_TYPE_FORM_FEILD);
 						dataDescInfo.setName(formField);
 						
